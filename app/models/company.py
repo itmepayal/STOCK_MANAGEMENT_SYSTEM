@@ -12,3 +12,4 @@ class Company(Base):
 
     stocks = relationship("StockData", back_populates="company")
     followers = relationship("UserStock", back_populates="company")
+    

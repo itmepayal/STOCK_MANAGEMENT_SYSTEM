@@ -15,11 +15,7 @@ from app.utils.auth import create_access_token, create_refresh_token, decode_tok
 # =========================================================
 def register_service(db: Session, username: str, email: str, password: str):
     user = register_user(db, username, email, password)
-
-    return {
-        "message": "User registered successfully",
-        "user_id": user.id
-    }
+    return user
 
 
 # =========================================================
@@ -43,7 +39,8 @@ def login_service(db: Session, email: str, password: str):
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
-        "token_type": "bearer"
+        "token_type": "bearer",
+        "user": user 
     }
 
 
@@ -95,7 +92,7 @@ def logout_service(db: Session, user: User):
     user.refresh_token = None
     db.commit()
 
-    return {"message": "Logged out successfully"}
+    return True
 
 
 # =========================================================
@@ -103,12 +100,5 @@ def logout_service(db: Session, user: User):
 # =========================================================
 def get_users_service(db: Session, skip: int = 0, limit: int = 10):
     users = db.query(User).offset(skip).limit(limit).all()
-    return [
-        {
-            "id": user.id,
-            "username": user.username,
-            "email": user.email
-        }
-        for user in users
-    ]
-    
+    total = db.query(User).count()
+    return users, total

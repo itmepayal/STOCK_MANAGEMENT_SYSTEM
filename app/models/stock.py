@@ -1,6 +1,5 @@
-from sqlalchemy import Column, Integer, Float, Date, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, Float, Date, ForeignKey
 from sqlalchemy.orm import relationship
-from datetime import datetime
 from app.db.database import Base
 
 class StockData(Base):
@@ -13,13 +12,17 @@ class StockData(Base):
     high = Column(Float, nullable=False)
     low = Column(Float, nullable=False)
     close = Column(Float, nullable=False)
-    volume = Column(Float)
-    daily_return = Column(Float)
-    ma_7d = Column(Float)
-    week_52_high = Column(Float)
-    week_52_low = Column(Float)
-    volatility = Column(Float)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    volume = Column(Float, nullable=False)
 
+    # Calculated metrics
+    daily_return = Column(Float, default=0)
+    ma_7d = Column(Float, default=0)
+    ma_20d = Column(Float, default=0)
+    ma_50d = Column(Float, default=0)
+    week_52_high = Column(Float, default=0)
+    week_52_low = Column(Float, default=0)
+    volatility = Column(Float, default=0)
+
+    # Relationship
     company = relationship("Company", back_populates="stocks")
     
