@@ -66,19 +66,16 @@ def get_data(symbol: str, db: Session = Depends(get_db)):
 # =========================================================
 # Get Companies
 # =========================================================
-@router.get(
-    "/companies",
-    response_model=SuccessResponse
-)
+@router.get("/companies", response_model=SuccessResponse)
 def get_companies(db: Session = Depends(get_db)):
     companies = db.query(Company).all()
 
     result = [
-        CompanyResponse(
-            symbol=c.symbol,
-            name=c.name,
-            sector=c.sector
-        )
+        {
+            "symbol": c.symbol,
+            "name": c.name,
+            "sector": c.sector
+        }
         for c in companies
     ]
 
@@ -86,7 +83,6 @@ def get_companies(db: Session = Depends(get_db)):
         message="Companies fetched successfully",
         data=result
     )
-
 
 # =========================================================
 # Summary
