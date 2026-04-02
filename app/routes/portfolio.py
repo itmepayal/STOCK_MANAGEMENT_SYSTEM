@@ -25,7 +25,7 @@ router = APIRouter(prefix="/portfolio", tags=["Portfolio"])
 @router.post(
     "/",
     status_code=status.HTTP_201_CREATED,
-    response_model=SuccessResponse[MessageResponse]
+    response_model=SuccessResponse
 )
 def add_portfolio_item(
     payload: PortfolioCreate,
