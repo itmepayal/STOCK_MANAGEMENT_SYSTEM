@@ -235,12 +235,14 @@ http://localhost:8000/docs
 
 ## 🔐 Environment Variables
 
-DATABASE_URL=postgresql://<username>:<password>@<host>/<database>
-SECRET_KEY=your_secret_key_here
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=15
-REFRESH_TOKEN_EXPIRE_DAYS=7
-REDIS_URL=redis://<user>:<password>@<host>:<port>
+| Variable                    | Value                                                |
+| --------------------------- | ---------------------------------------------------- |
+| DATABASE_URL                | postgresql://<username>:<password>@<host>/<database> |
+| SECRET_KEY                  | your_secret_key_here                                 |
+| ALGORITHM                   | HS256                                                |
+| ACCESS_TOKEN_EXPIRE_MINUTES | 15                                                   |
+| REFRESH_TOKEN_EXPIRE_DAYS   | 7                                                    |
+| REDIS_URL                   | redis://<user>:<password>@<host>:<port>              |
 
 ## 👨‍💻 Author
 

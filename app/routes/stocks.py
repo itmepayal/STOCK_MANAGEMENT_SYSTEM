@@ -97,14 +97,14 @@ def get_summary(symbol: str, db: Session = Depends(get_db)):
     if not stocks:
         raise HTTPException(404, "No data")
 
-    result = StockSummary(
-        symbol=symbol,
-        week_52_high=max(s["high"] for s in stocks),
-        week_52_low=min(s["low"] for s in stocks),
-        average_close=round(
+    result = {
+        "symbol": symbol,
+        "week_52_high": max(s["high"] for s in stocks),
+        "week_52_low": min(s["low"] for s in stocks),
+        "average_close": round(
             sum(s["close"] for s in stocks) / len(stocks), 2
         )
-    )
+    }
 
     return success_response(
         message="Summary fetched successfully",
