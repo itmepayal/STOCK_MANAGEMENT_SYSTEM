@@ -15,8 +15,13 @@ logger = logging.getLogger(__name__)
 # =========================================================
 # Add to Portfolio
 # =========================================================
-def add_to_portfolio(db: Session, user_id: int, symbol: str, quantity: int, buy_price: float):
-    
+def add_to_portfolio(
+    db: Session,
+    user_id: int,
+    symbol: str,
+    quantity: int,
+    buy_price: float
+):
     logger.info(f"Add to portfolio request user_id={user_id} symbol={symbol}")
 
     if quantity <= 0 or buy_price <= 0:
@@ -42,32 +47,42 @@ def add_to_portfolio(db: Session, user_id: int, symbol: str, quantity: int, buy_
     try:
         if existing:
             logger.info(f"Updating existing portfolio user_id={user_id} company_id={company.id}")
-            
-            existing.quantity += quantity
-            existing.buy_price = (existing.buy_price + buy_price) / 2
+
+            total_quantity = existing.quantity + quantity
+
+            existing.buy_price = (
+                (existing.buy_price * existing.quantity) +
+                (buy_price * quantity)
+            ) / total_quantity
+
+            existing.quantity = total_quantity
+            portfolio_item = existing
 
         else:
             logger.info(f"Creating new portfolio entry user_id={user_id} company_id={company.id}")
-            
-            portfolio = Portfolio(
+
+            portfolio_item = Portfolio(
                 user_id=user_id,
                 company_id=company.id,
                 quantity=quantity,
                 buy_price=buy_price
             )
-            db.add(portfolio)
+            db.add(portfolio_item)
 
         db.commit()
+        db.refresh(portfolio_item)
 
         logger.info(f"Portfolio updated successfully user_id={user_id} symbol={symbol}")
 
-        return True
+        return {
+            "success": True,
+            "data": portfolio_item
+        }
 
     except Exception as e:
         db.rollback()
         logger.error(f"Portfolio update failed user_id={user_id} error={str(e)}")
         raise
-
 
 # =========================================================
 # Get Portfolio
