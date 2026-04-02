@@ -7,7 +7,7 @@ https://stock-management-system-qgvh.onrender.com/docs
 https://stock-management-system-qgvh.onrender.com
 
 🚀 **Postman Collection Video:**  
-https://stock-management-system-qgvh.onrender.com
+https://www.loom.com/share/f738e2434fac4c5d896232c3225930e0
 
 ---
 
