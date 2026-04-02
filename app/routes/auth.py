@@ -3,18 +3,17 @@
 # =========================================================
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from app.schemas.auth import RegisterRequest, LoginRequest, RefreshRequest
-from app.schemas.user import UserResponse
-from app.services.auth_service import (
+from app.schemas import RegisterRequest, LoginRequest, RefreshRequest, UserResponse
+from app.services import (
     register_service,
     login_service,
     refresh_service,
     logout_service,
     get_users_service
 )
-from app.core.dependencies import get_db, get_current_user, require_admin
-from app.models.user import User
-from app.utils.response import success_response
+from app.core import get_db, get_current_user, require_admin
+from app.models import User
+from app.utils import success_response
 
 # =========================================================
 # Router Configuration

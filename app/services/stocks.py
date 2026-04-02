@@ -6,11 +6,8 @@ from fastapi import HTTPException, status
 import logging
 import json
 
-from app.models.company import Company
-from app.models.stock import StockData
-from app.models.user_stock import UserStock
-
-from app.core.redis_client import redis_client
+from app.models import Company, StockData, UserStock
+from app.core import redis_client
 
 # =========================================================
 # Logger
@@ -271,21 +268,24 @@ def get_risk_analysis(db: Session, symbol: str):
 # =========================================================
 # Performance Service
 # =========================================================
-def get_performance(db: Session, symbol: str, days: int):
+def get_performance(db: Session, symbol: str, days: int = 30):
     stocks = get_stock_data(db, symbol, limit=days)
 
-    if not stocks:
-        raise HTTPException(404, "No data")
+    if not stocks or len(stocks) < 2:
+        return None
 
     start_price = stocks[-1]["close"]
     end_price = stocks[0]["close"]
 
-    growth = ((end_price - start_price) / start_price) * 100
+    change = end_price - start_price
+    return_pct = (change / start_price) * 100
 
     return {
-        "symbol": symbol,
-        "days": days,
-        "growth_percent": round(growth, 2)
+        "start_price": start_price,
+        "end_price": end_price,
+        "absolute_change": round(change, 2),
+        "return_pct": round(return_pct, 2),
+        "trend": "up" if change > 0 else "down"
     }
 
 # =========================================================

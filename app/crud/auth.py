@@ -1,12 +1,14 @@
+# =========================================================
+# Auth Curd
+# =========================================================
 from sqlalchemy.orm import Session
-from app.models.user import User
-from app.utils.auth import hash_password, verify_password
-
 from sqlalchemy.orm import Session
-from app.models.user import User
-from app.models.role import Role
-from app.utils.auth import hash_password
+from app.models import User, Role
+from app.utils import hash_password, verify_password
 
+# =========================================================
+# Register User
+# =========================================================
 def register_user(db: Session, username: str, email: str, password: str):
     hashed = hash_password(password)
     role = db.query(Role).filter(Role.name == "user").first()
@@ -33,6 +35,9 @@ def register_user(db: Session, username: str, email: str, password: str):
 
     return user
 
+# =========================================================
+# Authenticate User
+# =========================================================
 def authenticate_user(db: Session, email: str, password: str):
     user = db.query(User).filter(User.email == email).first()
     if not user or not verify_password(password, user.hashed_password):

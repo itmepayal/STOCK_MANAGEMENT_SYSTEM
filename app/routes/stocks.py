@@ -3,10 +3,10 @@
 # =========================================================
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-
-from app.core.dependencies import get_db, get_current_user
-from app.services.data_loader import load_all_stocks
-from app.services.stock_service import (
+from typing import List
+from app.core import get_db, get_current_user
+from app.services import (
+    load_all_stocks,
     get_stock_data,
     follow_stock,
     unfollow_stock,
@@ -16,8 +16,10 @@ from app.services.stock_service import (
     get_performance,
     get_prediction
 )
-from app.models.company import Company
-from app.models.user import User
+from app.models import Company, User
+from app.schemas import (
+    SuccessResponse
+)
 from app.utils.response import success_response
 
 # =========================================================
@@ -28,18 +30,27 @@ router = APIRouter(prefix="/stocks", tags=["Stocks"])
 # =========================================================
 # Load Data
 # =========================================================
-@router.post("/load-all/", status_code=status.HTTP_200_OK)
+@router.post(
+    "/load-all/",
+    status_code=status.HTTP_200_OK,
+    response_model=SuccessResponse
+)
 def load_all(db: Session = Depends(get_db)):
     results = load_all_stocks(db)
+
     return success_response(
         message="All stock data loaded",
         data=results
     )
 
+
 # =========================================================
 # Get Stock Data
 # =========================================================
-@router.get("/data/{symbol}")
+@router.get(
+    "/data/{symbol}",
+    response_model=SuccessResponse
+)
 def get_data(symbol: str, db: Session = Depends(get_db)):
     stocks = get_stock_data(db, symbol)
 
@@ -51,19 +62,23 @@ def get_data(symbol: str, db: Session = Depends(get_db)):
         data=stocks
     )
 
+
 # =========================================================
 # Get Companies
 # =========================================================
-@router.get("/companies")
+@router.get(
+    "/companies",
+    response_model=SuccessResponse
+)
 def get_companies(db: Session = Depends(get_db)):
     companies = db.query(Company).all()
 
     result = [
-        {
-            "symbol": c.symbol,
-            "name": c.name,
-            "sector": c.sector
-        }
+        CompanyResponse(
+            symbol=c.symbol,
+            name=c.name,
+            sector=c.sector
+        )
         for c in companies
     ]
 
@@ -76,21 +91,24 @@ def get_companies(db: Session = Depends(get_db)):
 # =========================================================
 # Summary
 # =========================================================
-@router.get("/summary/{symbol}")
+@router.get(
+    "/summary/{symbol}",
+    response_model=SuccessResponse
+)
 def get_summary(symbol: str, db: Session = Depends(get_db)):
     stocks = get_stock_data(db, symbol, limit=365)
 
     if not stocks:
         raise HTTPException(404, "No data")
 
-    result = {
-        "symbol": symbol,
-        "52_week_high": max(s["high"] for s in stocks),
-        "52_week_low": min(s["low"] for s in stocks),
-        "average_close": round(
+    result = StockSummary(
+        symbol=symbol,
+        week_52_high=max(s["high"] for s in stocks),
+        week_52_low=min(s["low"] for s in stocks),
+        average_close=round(
             sum(s["close"] for s in stocks) / len(stocks), 2
         )
-    }
+    )
 
     return success_response(
         message="Summary fetched successfully",
@@ -101,23 +119,56 @@ def get_summary(symbol: str, db: Session = Depends(get_db)):
 # =========================================================
 # Compare
 # =========================================================
-@router.get("/compare")
-def compare(symbol1: str, symbol2: str, db: Session = Depends(get_db)):
-    s1 = get_stock_data(db, symbol1, limit=1)
-    s2 = get_stock_data(db, symbol2, limit=1)
+@router.get(
+    "/compare",
+    response_model=SuccessResponse
+)
+def compare(
+    symbol1: str,
+    symbol2: str,
+    days: int = 30,
+    db: Session = Depends(get_db)
+):
+    perf1 = get_performance(db, symbol1, days)
+    perf2 = get_performance(db, symbol2, days)
 
-    if not s1 or not s2:
-        raise HTTPException(404, "Data missing")
+    if not perf1 or not perf2:
+        raise HTTPException(404, "Performance data missing")
+
+    return1 = perf1.get("return_pct", 0)
+    return2 = perf2.get("return_pct", 0)
+
+    if return1 > return2:
+        winner = symbol1
+    elif return2 > return1:
+        winner = symbol2
+    else:
+        winner = "tie"
+
+    insight = {
+        "summary": (
+            f"{winner} outperformed over {days} days"
+            if winner != "tie"
+            else f"Both stocks performed equally over {days} days"
+        ),
+        "recommendation": (
+            winner if winner != "tie" else "No clear winner"
+        )
+    }
 
     result = {
         "symbol1": symbol1,
         "symbol2": symbol2,
-        "latest_close_1": s1[0]["close"],
-        "latest_close_2": s2[0]["close"]
+        "period_days": days,
+        "performance_1": perf1,
+        "performance_2": perf2,
+        "better_performer": winner,
+        "return_difference": round(abs(return1 - return2), 2),
+        "insight": insight
     }
 
     return success_response(
-        message="Comparison fetched successfully",
+        message="Stock comparison analysis generated",
         data=result
     )
 
@@ -125,7 +176,10 @@ def compare(symbol1: str, symbol2: str, db: Session = Depends(get_db)):
 # =========================================================
 # Follow Stock
 # =========================================================
-@router.post("/follow/{symbol}")
+@router.post(
+    "/follow/{symbol}",
+    response_model=SuccessResponse
+)
 def follow(
     symbol: str,
     db: Session = Depends(get_db),
@@ -133,15 +187,16 @@ def follow(
 ):
     result = follow_stock(db, current_user.id, symbol)
 
-    return success_response(
-        message=result["message"]
-    )
+    return success_response(message=result["message"])
 
 
 # =========================================================
 # Unfollow Stock
 # =========================================================
-@router.delete("/unfollow/{symbol}")
+@router.delete(
+    "/unfollow/{symbol}",
+    response_model=SuccessResponse
+)
 def unfollow(
     symbol: str,
     db: Session = Depends(get_db),
@@ -149,14 +204,16 @@ def unfollow(
 ):
     result = unfollow_stock(db, current_user.id, symbol)
 
-    return success_response(
-        message=result["message"]
-    )
+    return success_response(message=result["message"])
+
 
 # =========================================================
-# User Stocks 
+# User Stocks
 # =========================================================
-@router.get("/my-stocks")
+@router.get(
+    "/my-stocks",
+    response_model=SuccessResponse
+)
 def my_stocks(
     skip: int = Query(0),
     limit: int = Query(10),
@@ -170,10 +227,14 @@ def my_stocks(
         data=result
     )
 
+
 # =========================================================
 # Top Movers
 # =========================================================
-@router.get("/top-movers")
+@router.get(
+    "/top-movers",
+    response_model=SuccessResponse
+)
 def top_movers(db: Session = Depends(get_db)):
     result = get_top_movers(db)
 
@@ -186,7 +247,10 @@ def top_movers(db: Session = Depends(get_db)):
 # =========================================================
 # Risk Analysis
 # =========================================================
-@router.get("/risk/{symbol}")
+@router.get(
+    "/risk/{symbol}",
+    response_model=SuccessResponse
+)
 def risk(symbol: str, db: Session = Depends(get_db)):
     result = get_risk_analysis(db, symbol)
 
@@ -195,10 +259,14 @@ def risk(symbol: str, db: Session = Depends(get_db)):
         data=result
     )
 
+
 # =========================================================
 # Performance
 # =========================================================
-@router.get("/performance/{symbol}")
+@router.get(
+    "/performance/{symbol}",
+    response_model=SuccessResponse
+)
 def performance(symbol: str, days: int = 30, db: Session = Depends(get_db)):
     result = get_performance(db, symbol, days)
 
@@ -210,7 +278,10 @@ def performance(symbol: str, days: int = 30, db: Session = Depends(get_db)):
 # =========================================================
 # Prediction
 # =========================================================
-@router.get("/predict/{symbol}")
+@router.get(
+    "/predict/{symbol}",
+    response_model=SuccessResponse
+)
 def predict(symbol: str, db: Session = Depends(get_db)):
     result = get_prediction(db, symbol)
 

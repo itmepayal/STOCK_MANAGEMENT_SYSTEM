@@ -5,8 +5,14 @@ from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime, timedelta
 
-from app.crud.company import get_company_by_symbol, create_company
-from app.models.stock import StockData
+from app.crud import get_company_by_symbol, create_company
+from app.models import StockData
+
+# ============================
+# Folder Create
+# ============================
+import os
+os.makedirs("data", exist_ok=True)
 
 # ============================
 # NSE COMPANIES
@@ -56,13 +62,14 @@ def load_stock_data(db: Session, symbol: str, period: str = "1y"):
     try:
         df = yf.download(symbol, period=period, progress=False)
         if df.empty:
-            return {"symbol": symbol, "status": "No data found"}
+            return {"symbol": symbol, "status": "No data found"}, None
     except Exception as e:
-        return {"symbol": symbol, "status": f"Error downloading: {str(e)}"}
+        return {"symbol": symbol, "status": f"Error downloading: {str(e)}"}, None
 
     # HANDLE MULTIINDEX
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = [col[0] for col in df.columns]
+
     df = df.reset_index()
     df.rename(columns={df.columns[0]: "Date"}, inplace=True)
     df['Date'] = pd.to_datetime(df['Date']).dt.date
@@ -70,11 +77,11 @@ def load_stock_data(db: Session, symbol: str, period: str = "1y"):
     # DATA CLEANING
     required_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
     if any(col not in df.columns for col in required_columns):
-        return {"symbol": symbol, "status": "Missing required columns"}
+        return {"symbol": symbol, "status": "Missing required columns"}, None
 
     df.dropna(subset=required_columns, inplace=True)
     if df.empty:
-        return {"symbol": symbol, "status": "No valid data after cleaning"}
+        return {"symbol": symbol, "status": "No valid data after cleaning"}, None
 
     # CALCULATED METRICS
     df['daily_return'] = (df['Close'] - df['Open']) / df['Open'].replace(0, np.nan)
@@ -84,18 +91,24 @@ def load_stock_data(db: Session, symbol: str, period: str = "1y"):
     df['week_52_high'] = df['High'].rolling(window=min(252, len(df)), min_periods=1).max()
     df['week_52_low'] = df['Low'].rolling(window=min(252, len(df)), min_periods=1).min()
     df['volatility'] = df['daily_return'].rolling(window=min(7, len(df)), min_periods=1).std()
+
     df.fillna(0, inplace=True)
     df.replace([float('inf'), float('-inf')], 0, inplace=True)
 
     # FETCH EXISTING DATES
-    existing_dates = {r[0] if not hasattr(r[0], 'date') else r[0].date() 
-                    for r in db.query(StockData.date).filter(StockData.company_id == company.id).all()}
+    existing_dates = {
+        r[0] if not hasattr(r[0], 'date') else r[0].date()
+        for r in db.query(StockData.date)
+        .filter(StockData.company_id == company.id)
+        .all()
+    }
 
     # PREPARE BULK INSERT
     stock_objects = []
-    for idx, row in df.iterrows():
+    for _, row in df.iterrows():
         if row['Date'] in existing_dates:
             continue
+
         stock_objects.append(
             StockData(
                 company_id=company.id,
@@ -122,14 +135,26 @@ def load_stock_data(db: Session, symbol: str, period: str = "1y"):
             for i in range(0, len(stock_objects), batch_size):
                 db.add_all(stock_objects[i:i+batch_size])
                 db.flush()
+
             db.commit()
-            return {"symbol": symbol, "status": f"{len(stock_objects)} new records added"}
+
+            return {
+                "symbol": symbol,
+                "status": f"{len(stock_objects)} new records added"
+            }, df
+
         except Exception as e:
             db.rollback()
-            return {"symbol": symbol, "status": f"Database error: {str(e)}"}
-    else:
-        return {"symbol": symbol, "status": "No new data to add"}
+            return {
+                "symbol": symbol,
+                "status": f"Database error: {str(e)}"
+            }, None
 
+    else:
+        return {
+            "symbol": symbol,
+            "status": "No new data to add"
+        }, df
 
 # ============================
 # Load All NSE Stocks
@@ -139,7 +164,19 @@ def load_all_stocks(db: Session, symbols: List[str] = None, period: str = "1y"):
         symbols = NSE_COMPANIES
 
     results = []
+    all_dataframes = []
+
     for symbol in symbols:
-        result = load_stock_data(db, symbol, period)
+        result, df = load_stock_data(db, symbol, period)
         results.append(result)
+
+        if df is not None and not df.empty:
+            df["symbol"] = symbol
+            all_dataframes.append(df)
+
+    if all_dataframes:
+        combined_df = pd.concat(all_dataframes, ignore_index=True)
+        combined_path = f"data/all_stocks_{datetime.now().date()}.csv"
+        combined_df.to_csv(combined_path, index=False, encoding="utf-8")
+
     return results
