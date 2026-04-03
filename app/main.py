@@ -9,7 +9,7 @@ from app.db.database import Base, engine
 app = FastAPI(title="Stock Intelligence API")
 
 origins = [
-    "http://localhost:3000",  
+    "https://stock-management-system-frontend-ya.vercel.app",  
     "http://127.0.0.1:3000",
 ]
 
@@ -29,3 +29,4 @@ app.include_router(portfolio.router)
 def create_tables():
     Base.metadata.create_all(bind=engine)
     print("Tables are ready!")
+    
